@@ -50,42 +50,37 @@ func parseJSONtoHost(jsonResponse []byte) (Host, error) {
 
 }
 
-func analyze(hostName string) {
+func analyze(hostName string) (Host, error) {
 
 	// HTTP request and response into Info struct
 	infoURL := "https://api.ssllabs.com/api/v2/info"
 	bodyInfo, _, errInfo := httpHelper(infoURL)
 	if errInfo != nil {
-		fmt.Println("Error fetching data:", errInfo)
-		return
+		return Host{}, fmt.Errorf("error fetching info data: %w", errInfo)
 	}
 
 	info, errInfo := parseJSONtoInfo(bodyInfo)
 	if errInfo != nil {
-		fmt.Println("Error parsing info JSON:", errInfo)
-		return
+		return Host{}, fmt.Errorf("error parsing info JSON: %w", errInfo)
 	}
 
 	// HTTP request and response into Host struct
 	apiURL := buildAnalyzeURL(hostName, true)
 	body, _, err := httpHelper(apiURL)
 	if err != nil {
-		fmt.Println("Error fetching data:", err)
-		return
+		return Host{}, fmt.Errorf("error fetching data: %w", err)
 	}
 
 	host, errHost := parseJSONtoHost(body)
 	if errHost != nil {
-		fmt.Println("Error parsing host JSON:", errHost)
-		return
+		return Host{}, fmt.Errorf("error parsing host JSON: %w", errHost)
 	}
 	status := host.Status
 
 	for status != "READY" && status != "ERROR" {
 
 		if info.CurrentAssessments >= info.MaxAssessments {
-			fmt.Println("Maximum number of assessments reached. Please try again later.")
-			return
+			return Host{}, fmt.Errorf("maximum number of assessments reached. Please try again later")
 		}
 		apiURLNext := buildAnalyzeURL(hostName, false)
 
@@ -96,17 +91,16 @@ func analyze(hostName string) {
 		}
 		body, _, err = httpHelper(apiURLNext)
 		if err != nil {
-			fmt.Println("Error fetching data:", err)
-			return
+			return Host{}, fmt.Errorf("error fetching data: %w", err)
 		}
 		host, errHost = parseJSONtoHost(body)
 		if errHost != nil {
-			fmt.Println("Error parsing host JSON:", errHost)
-			return
+			return Host{}, fmt.Errorf("error parsing host JSON: %w", errHost)
 		}
 		status = host.Status
 	}
-	printInfo(host)
+
+	return host, nil
 
 }
 
@@ -127,16 +121,15 @@ func httpHelper(apiURL string) (body []byte, statusCode int, err error) {
 
 	switch statusCode {
 	case 400:
-		return nil, statusCode, fmt.Errorf("invocation error (e.g., invalid parameters)")
+		return body, statusCode, fmt.Errorf("invocation error (e.g., invalid parameters)")
 	case 429:
-		return nil, statusCode, fmt.Errorf("client request rate too high or too many new assessments too fast")
+		return body, statusCode, fmt.Errorf("client request rate too high or too many new assessments too fast")
 	case 500:
-		return nil, statusCode, fmt.Errorf("internal error")
+		return body, statusCode, fmt.Errorf("internal error")
 	case 503:
-		return nil, statusCode, fmt.Errorf("the service is not available (e.g., down for maintenance)")
+		return body, statusCode, fmt.Errorf("the service is not available (e.g., down for maintenance)")
 	case 529:
-		return nil, statusCode, fmt.Errorf("the service is overloaded")
-
+		return body, statusCode, fmt.Errorf("the service is overloaded")
 	}
 
 	return body, statusCode, nil
