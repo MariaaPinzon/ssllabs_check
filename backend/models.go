@@ -32,25 +32,4 @@ type Endpoint struct {
 	Delegation           int    `json:"delegation"`
 }
 
-type Info struct {
-	Version              string   `json:"version"`
-	CriteriaVersion      string   `json:"criteriaVersion"`
-	MaxAssessments       int      `json:"maxAssessments"`
-	CurrentAssessments   int      `json:"currentAssessments"`
-	NewAssessmentCoolOff int64    `json:"newAssessmentCoolOff"`
-	Messages             []string `json:"messages"`
-}
 
-// Estructura simplificada para la respuesta personalizada
-type AnalysisResult struct {
-	Host      string              `json:"host"`
-	Port      int                 `json:"port"`
-	Status    string              `json:"status"`
-	Endpoints []EndpointSummary   `json:"endpoints"`
-}
-
-type EndpointSummary struct {
-	IPAddress string `json:"ipAddress"`
-	Grade     string `json:"grade"`
-	Status    string `json:"status"`
-}

@@ -1,0 +1,106 @@
+.results-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-top: 2rem;
+  position: relative;
+  min-height: 400px;
+}
+
+.engine-version {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  color: white;
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.endpoints-section {
+  width: 100%;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.endpoints-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.endpoints-table thead {
+  background-color: #000000;
+}
+
+.endpoints-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: white;
+  font-size: 1rem;
+}
+
+.endpoints-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.endpoints-table tbody tr.row-even {
+  background-color: #ede9fe;
+}
+
+.endpoints-table tbody tr.row-odd {
+  background-color: white;
+}
+
+.endpoints-table tbody tr:hover {
+  background-color: #ddd6fe;
+}
+
+.endpoints-table td {
+  padding: 1rem;
+  vertical-align: top;
+}
+
+.ip-cell {
+  min-width: 200px;
+  color: #6b21a8;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.duration-cell {
+  color: #000000;
+  font-weight: 500;
+}
+
+.warnings-cell {
+  color: #000000;
+  font-weight: 500;
+}
+
+.grade-cell {
+  text-align: left;
+}
+
+.grade-text {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #000000;
+}
+
+@media (max-width: 768px) {
+  .endpoints-table {
+    font-size: 0.875rem;
+  }
+
+  .endpoints-table th,
+  .endpoints-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .engine-version {
+    position: static;
+    margin-bottom: 1rem;
+    text-align: right;
+  }
+}

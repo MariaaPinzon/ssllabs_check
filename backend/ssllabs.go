@@ -6,10 +6,22 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
-func buildAnalyzeURL(hostName string, startNew bool) string {
+const maxAge = 86400
+
+type HTTPError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	return e.Message
+}
+
+func buildAnalyzeURL(hostName string, startNew bool, fromCache bool) string {
 
 	basePath := "https://api.ssllabs.com/api/v2/analyze"
 	u, _ := url.Parse(basePath)
@@ -20,21 +32,13 @@ func buildAnalyzeURL(hostName string, startNew bool) string {
 	if startNew {
 		query.Set("startNew", "on")
 	}
+	if fromCache {
+		query.Set("fromCache", "on")
+		query.Set("maxAge", strconv.Itoa(maxAge))
+	}
 	u.RawQuery = query.Encode()
 
 	return u.String()
-}
-
-func parseJSONtoInfo(jsonResponse []byte) (Info, error) {
-
-	var info Info
-
-	result := json.Unmarshal(jsonResponse, &info)
-	if result != nil {
-		fmt.Println("Error parsing JSON:", result)
-		return Info{}, result
-	}
-	return info, nil
 }
 
 func parseJSONtoHost(jsonResponse []byte) (Host, error) {
@@ -50,23 +54,11 @@ func parseJSONtoHost(jsonResponse []byte) (Host, error) {
 
 }
 
-func analyze(hostName string) (Host, error) {
+func analyze(hostName string, fromCache bool) (Host, error) {
 
-	// HTTP request and response into Info struct
-	infoURL := "https://api.ssllabs.com/api/v2/info"
-	bodyInfo, _, errInfo := httpHelper(infoURL)
-	if errInfo != nil {
-		return Host{}, fmt.Errorf("error fetching info data: %w", errInfo)
-	}
-
-	info, errInfo := parseJSONtoInfo(bodyInfo)
-	if errInfo != nil {
-		return Host{}, fmt.Errorf("error parsing info JSON: %w", errInfo)
-	}
-
-	// HTTP request and response into Host struct
-	apiURL := buildAnalyzeURL(hostName, true)
-	body, _, err := httpHelper(apiURL)
+	startNew := !fromCache
+	apiURL := buildAnalyzeURL(hostName, startNew, fromCache)
+	body, maxAssessments, currentAssessments, err := makeRequest(apiURL)
 	if err != nil {
 		return Host{}, fmt.Errorf("error fetching data: %w", err)
 	}
@@ -78,21 +70,23 @@ func analyze(hostName string) (Host, error) {
 	status := host.Status
 
 	for status != "READY" && status != "ERROR" {
-
-		if info.CurrentAssessments >= info.MaxAssessments {
+		if maxAssessments > 0 && currentAssessments >= maxAssessments {
 			return Host{}, fmt.Errorf("maximum number of assessments reached. Please try again later")
 		}
-		apiURLNext := buildAnalyzeURL(hostName, false)
+
+		apiURLNext := buildAnalyzeURL(hostName, false, fromCache)
 
 		if status == "IN_PROGRESS" {
 			time.Sleep(10 * time.Second)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		body, _, err = httpHelper(apiURLNext)
+
+		body, maxAssessments, currentAssessments, err = makeRequest(apiURLNext)
 		if err != nil {
 			return Host{}, fmt.Errorf("error fetching data: %w", err)
 		}
+
 		host, errHost = parseJSONtoHost(body)
 		if errHost != nil {
 			return Host{}, fmt.Errorf("error parsing host JSON: %w", errHost)
@@ -101,39 +95,44 @@ func analyze(hostName string) (Host, error) {
 	}
 
 	return host, nil
-
 }
 
-func httpHelper(apiURL string) (body []byte, statusCode int, err error) {
+func makeRequest(apiURL string) (body []byte, maxAssessments int, currentAssessments int, err error) {
 	resp, err := http.Get(apiURL)
-
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	body, errBody := io.ReadAll(resp.Body)
-	statusCode = resp.StatusCode
-
 	if errBody != nil {
-		return nil, statusCode, errBody
+		return nil, 0, 0, errBody
+	}
+
+	statusCode := resp.StatusCode
+
+	maxAssessments, _ = strconv.Atoi(resp.Header.Get("X-Max-Assessments"))
+	currentAssessments, _ = strconv.Atoi(resp.Header.Get("X-Current-Assessments"))
+
+	if statusCode == 503 {
+		time.Sleep(15 * time.Second)
+		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 503, Message: "the service is not available (e.g., down for maintenance)"}
+	}
+	if statusCode == 529 {
+		time.Sleep(30 * time.Second)
+		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 529, Message: "the service is overloaded"}
 	}
 
 	switch statusCode {
 	case 400:
-		return body, statusCode, fmt.Errorf("invocation error (e.g., invalid parameters)")
+		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 400, Message: "invocation error (e.g., invalid parameters)"}
 	case 429:
-		return body, statusCode, fmt.Errorf("client request rate too high or too many new assessments too fast")
+		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 429, Message: "client request rate too high or too many new assessments too fast"}
 	case 500:
-		return body, statusCode, fmt.Errorf("internal error")
-	case 503:
-		return body, statusCode, fmt.Errorf("the service is not available (e.g., down for maintenance)")
-	case 529:
-		return body, statusCode, fmt.Errorf("the service is overloaded")
+		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 500, Message: "internal error"}
 	}
 
-	return body, statusCode, nil
-
+	return body, maxAssessments, currentAssessments, nil
 }
 
 func printInfo(host Host) {
