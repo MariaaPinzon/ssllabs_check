@@ -134,19 +134,3 @@ func makeRequest(apiURL string) (body []byte, maxAssessments int, currentAssessm
 
 	return body, maxAssessments, currentAssessments, nil
 }
-
-func printInfo(host Host) {
-
-	fmt.Printf("Host: %s\n", host.Host)
-	fmt.Printf("Port: %d\n", host.Port)
-	fmt.Printf("Protocol: %s\n", host.Protocol)
-	fmt.Printf("IsPublic: %t\n", host.IsPublic)
-	fmt.Printf("Status: %s\n", host.Status)
-	fmt.Printf("StatusMessage: %s\n", host.StatusMessage)
-
-	for _, endpoint := range host.Endpoints {
-		fmt.Printf("  Endpoint IPAddress: %s\n", endpoint.IPAddress)
-		fmt.Printf("  Endpoint StatusMessage: %s\n", endpoint.StatusMessage)
-		fmt.Printf("  Endpoint Grade: %s\n", endpoint.Grade)
-	}
-}
