@@ -9,7 +9,7 @@ Este proyecto es una aplicación web que permite verificar la seguridad TLS/SSL 
 
 ## Instalación y Ejecución
 
-### Backend (Go)
+### Backend
 
 1. Navega al directorio del backend:
 ```bash
