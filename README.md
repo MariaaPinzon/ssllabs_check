@@ -26,9 +26,24 @@ go mod download
 go run .
 ```
 
-El servidor backend se ejecutará en `http://localhost:8080` 
+El servidor backend se ejecutará en `http://localhost:8080`
 
-### Frontend (React + Vite)
+#### Configuración avanzada
+
+**Variable de entorno ALLOWED_ORIGIN**: Puedes configurar qué origen tiene permiso para hacer peticiones al backend mediante CORS:
+
+```bash
+# Windows PowerShell
+$env:ALLOWED_ORIGIN="http://localhost:3000"; go run .
+
+# Linux/Mac
+ALLOWED_ORIGIN=http://localhost:3000 go run .
+
+```
+
+Si no se configura, por defecto usa `http://localhost:5173` (puerto de Vite) 
+
+### Frontend 
 
 1. Navega al directorio del frontend:
 ```bash
@@ -64,6 +79,7 @@ Este proyecto utiliza la API v2 de SSL Labs. Para más información sobre la API
 
 [SSL Labs API Documentation](https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs-v2-deprecated.md)
 
+
 ## Estructura del Proyecto
 
 ```
@@ -82,7 +98,7 @@ ssllabs_check/
 └── README.md
 ```
 
-## Autor
+## Autora
 
 María Pinzon
 

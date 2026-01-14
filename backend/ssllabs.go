@@ -47,7 +47,6 @@ func parseJSONtoHost(jsonResponse []byte) (Host, error) {
 
 	result := json.Unmarshal(jsonResponse, &host)
 	if result != nil {
-		fmt.Println("Error parsing JSON:", result)
 		return Host{}, result
 	}
 	return host, nil
@@ -98,39 +97,49 @@ func analyze(hostName string, fromCache bool) (Host, error) {
 }
 
 func makeRequest(apiURL string) (body []byte, maxAssessments int, currentAssessments int, err error) {
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return nil, 0, 0, err
+	const maxRetries = 3
+	retryCount := 0
+
+	for {
+		resp, err := http.Get(apiURL)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		body, errBody := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if errBody != nil {
+			return nil, 0, 0, errBody
+		}
+
+		statusCode := resp.StatusCode
+		maxAssessments, _ = strconv.Atoi(resp.Header.Get("X-Max-Assessments"))
+		currentAssessments, _ = strconv.Atoi(resp.Header.Get("X-Current-Assessments"))
+
+		if statusCode == 503 && retryCount < maxRetries {
+			retryCount++
+			time.Sleep(15 * time.Second)
+			continue
+		}
+		if statusCode == 529 && retryCount < maxRetries {
+			retryCount++
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		switch statusCode {
+		case 400:
+			return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 400, Message: "invocation error (e.g., invalid parameters)"}
+		case 429:
+			return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 429, Message: "client request rate too high or too many new assessments too fast"}
+		case 500:
+			return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 500, Message: "internal error"}
+		case 503:
+			return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 503, Message: "the service is not available (e.g., down for maintenance)"}
+		case 529:
+			return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 529, Message: "the service is overloaded"}
+		}
+
+		return body, maxAssessments, currentAssessments, nil
 	}
-	defer resp.Body.Close()
-
-	body, errBody := io.ReadAll(resp.Body)
-	if errBody != nil {
-		return nil, 0, 0, errBody
-	}
-
-	statusCode := resp.StatusCode
-
-	maxAssessments, _ = strconv.Atoi(resp.Header.Get("X-Max-Assessments"))
-	currentAssessments, _ = strconv.Atoi(resp.Header.Get("X-Current-Assessments"))
-
-	if statusCode == 503 {
-		time.Sleep(15 * time.Second)
-		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 503, Message: "the service is not available (e.g., down for maintenance)"}
-	}
-	if statusCode == 529 {
-		time.Sleep(30 * time.Second)
-		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 529, Message: "the service is overloaded"}
-	}
-
-	switch statusCode {
-	case 400:
-		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 400, Message: "invocation error (e.g., invalid parameters)"}
-	case 429:
-		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 429, Message: "client request rate too high or too many new assessments too fast"}
-	case 500:
-		return body, maxAssessments, currentAssessments, &HTTPError{StatusCode: 500, Message: "internal error"}
-	}
-
-	return body, maxAssessments, currentAssessments, nil
 }
