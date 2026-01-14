@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const maxAge = 86400
+const maxAge = 86400 // 24 hours in seconds
 
 type HTTPError struct {
 	StatusCode int
@@ -21,6 +21,17 @@ func (e *HTTPError) Error() string {
 	return e.Message
 }
 
+// buildAnalyzeURL constructs the SSL Labs API URL for analyzing a domain's TLS/SSL configuration.
+// It builds the query string with appropriate parameters based on whether a new analysis should be
+// started or cached results should be used.
+//
+// Parameters:
+//   - hostName: The domain name to analyze (e.g., "example.com")
+//   - startNew: If true, starts a new analysis; if false, retrieves existing results
+//   - fromCache: If true, allows using cached results from the server (max age: 24 hours)
+//
+// Returns:
+//   - string: The complete SSL Labs API URL with encoded query parameters
 func buildAnalyzeURL(hostName string, startNew bool, fromCache bool) string {
 
 	basePath := "https://api.ssllabs.com/api/v2/analyze"
@@ -41,6 +52,15 @@ func buildAnalyzeURL(hostName string, startNew bool, fromCache bool) string {
 	return u.String()
 }
 
+// parseJSONtoHost parses a JSON response from the SSL Labs API into a Host struct.
+// It deserializes the byte array containing the API response into a structured format.
+//
+// Parameters:
+//   - jsonResponse: A byte array containing the JSON response from SSL Labs API
+//
+// Returns:
+//   - Host: The parsed host information with TLS/SSL analysis details
+//   - error: An error if JSON unmarshaling fails, nil otherwise
 func parseJSONtoHost(jsonResponse []byte) (Host, error) {
 
 	var host Host
@@ -53,6 +73,16 @@ func parseJSONtoHost(jsonResponse []byte) (Host, error) {
 
 }
 
+// analyze performs TLS/SSL security analysis of a domain using the SSL Labs API.
+// It initiates the analysis, polls the API until the analysis is complete, and returns the results.
+//
+// Parameters:
+//   - hostName: The domain name to analyze (e.g., "example.com")
+//   - fromCache: If true, attempts to retrieve cached results; if false, forces a new analysis
+//
+// Returns:
+//   - Host: Host struct containing all analysis results including endpoint details
+//   - error: An error if the API request fails, parsing fails, or assessment limits are reached
 func analyze(hostName string, fromCache bool) (Host, error) {
 
 	startNew := !fromCache
@@ -96,8 +126,19 @@ func analyze(hostName string, fromCache bool) (Host, error) {
 	return host, nil
 }
 
+// makeRequest performs an HTTP GET request to the SSL Labs API with retry logic.
+// The function also extracts rate limit information from response headers.
+//
+// Parameters:
+//   - apiURL: The complete SSL Labs API URL to request
+//
+// Returns:
+//   - body: The response body as a byte array
+//   - maxAssessments: Maximum number of concurrent assessments allowed
+//   - currentAssessments: Current number of active assessments
+//   - err: An error if the request fails or returns a non-retryable error status
 func makeRequest(apiURL string) (body []byte, maxAssessments int, currentAssessments int, err error) {
-	const maxRetries = 3
+	const maxRetries = 3 // Maximum number of retries for 503 and 529 status codes
 	retryCount := 0
 
 	for {
