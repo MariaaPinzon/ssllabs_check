@@ -101,7 +101,3 @@ ssllabs_check/
 ## Autora
 
 María Pinzon
-
----
-
-**Nota**: Este proyecto utiliza servicios de terceros (SSL Labs). 
